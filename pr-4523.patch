@@ -1,0 +1,1234 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index b6eaac2d95..bfd3a9ed6f 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -26,6 +26,7 @@ The minor version will be incremented upon a breaking change and the patch versi
+ ### Fixes
+ 
+ - idl: Bump version to 0.1.3 ([#4453](https://github.com/solana-foundation/anchor/pull/4453)).
++- lang: Migrate `anchor-syn` from syn 1.x to syn 2.0, allowing use of modern Rust syntax ([#4523](https://github.com/solana-foundation/anchor/issues/4523)).
+ - lang: Avoid fatal errors in IDL building when modern Rust syntax is in use ([#4520](https://github.com/solana-foundation/anchor/pull/4520)).
+ - client: Avoid panic in `parse_logs_response` when a program-emitted log line ends with `invoke [1]` ([#4461](https://github.com/solana-foundation/anchor/issues/4461)).
+ - cli: Correctly honor `--skip-seed-phrase-validation` in `keygen recover` ([#4417](https://github.com/solana-foundation/anchor/pull/4417)).
+diff --git a/Cargo.lock b/Cargo.lock
+index ddeb468fcc..397f636f2f 100644
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -134,7 +134,7 @@ version = "1.0.2"
+ dependencies = [
+  "proc-macro2",
+  "quote",
+- "syn 1.0.109",
++ "syn 2.0.117",
+ ]
+ 
+ [[package]]
+@@ -144,7 +144,7 @@ dependencies = [
+  "anchor-syn",
+  "proc-macro2",
+  "quote",
+- "syn 1.0.109",
++ "syn 2.0.117",
+ ]
+ 
+ [[package]]
+@@ -153,7 +153,7 @@ version = "1.0.2"
+ dependencies = [
+  "anchor-syn",
+  "quote",
+- "syn 1.0.109",
++ "syn 2.0.117",
+ ]
+ 
+ [[package]]
+@@ -162,7 +162,7 @@ version = "1.0.2"
+ dependencies = [
+  "anchor-syn",
+  "quote",
+- "syn 1.0.109",
++ "syn 2.0.117",
+ ]
+ 
+ [[package]]
+@@ -172,7 +172,7 @@ dependencies = [
+  "anchor-syn",
+  "proc-macro2",
+  "quote",
+- "syn 1.0.109",
++ "syn 2.0.117",
+ ]
+ 
+ [[package]]
+@@ -185,7 +185,7 @@ dependencies = [
+  "heck 0.3.3",
+  "proc-macro2",
+  "quote",
+- "syn 1.0.109",
++ "syn 2.0.117",
+ ]
+ 
+ [[package]]
+@@ -288,7 +288,7 @@ version = "1.0.2"
+ dependencies = [
+  "anchor-syn",
+  "quote",
+- "syn 1.0.109",
++ "syn 2.0.117",
+ ]
+ 
+ [[package]]
+@@ -300,7 +300,7 @@ dependencies = [
+  "proc-macro-crate 3.5.0",
+  "proc-macro2",
+  "quote",
+- "syn 1.0.109",
++ "syn 2.0.117",
+ ]
+ 
+ [[package]]
+@@ -309,7 +309,7 @@ version = "1.0.2"
+ dependencies = [
+  "proc-macro2",
+  "quote",
+- "syn 1.0.109",
++ "syn 2.0.117",
+ ]
+ 
+ [[package]]
+@@ -418,7 +418,7 @@ dependencies = [
+  "quote",
+  "serde",
+  "sha2 0.11.0",
+- "syn 1.0.109",
++ "syn 2.0.117",
+  "thiserror 1.0.69",
+ ]
+ 
+diff --git a/Cargo.toml b/Cargo.toml
+index 70438018f0..d574823212 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -62,6 +62,7 @@ solana-transaction = "3.0.1"
+ 
+ # Non solana crates
+ cargo_toml = "0.22.3"
++syn = "2"
+ 
+ [profile.release]
+ lto = true
+diff --git a/cli/cli-macros/Cargo.toml b/cli/cli-macros/Cargo.toml
+index 88eeb8ff80..aa196e6bcd 100644
+--- a/cli/cli-macros/Cargo.toml
++++ b/cli/cli-macros/Cargo.toml
+@@ -13,4 +13,4 @@ proc-macro = true
+ [dependencies]
+ quote = "1"
+ proc-macro2 = "1.0"
+-syn = "2.0"
++syn = { workspace = true }
+diff --git a/lang/attribute/access-control/Cargo.toml b/lang/attribute/access-control/Cargo.toml
+index d3bcba669e..384f2d0958 100644
+--- a/lang/attribute/access-control/Cargo.toml
++++ b/lang/attribute/access-control/Cargo.toml
+@@ -21,4 +21,4 @@ indexing-slicing = "deny"
+ [dependencies]
+ proc-macro2 = "1"
+ quote = "1"
+-syn = { version = "1", features = ["full"] }
++syn = { workspace = true, features = ["full"] }
+diff --git a/lang/attribute/account/Cargo.toml b/lang/attribute/account/Cargo.toml
+index 8e5b3b6314..21556e20fe 100644
+--- a/lang/attribute/account/Cargo.toml
++++ b/lang/attribute/account/Cargo.toml
+@@ -28,4 +28,4 @@ event-cpi = []
+ anchor-syn = { path = "../../syn", version = "1.0.2", features = ["hash"] }
+ proc-macro2 = "1"
+ quote = "1"
+-syn = { version = "1", features = ["full"] }
++syn = { workspace = true, features = ["full"] }
+diff --git a/lang/attribute/account/src/lib.rs b/lang/attribute/account/src/lib.rs
+index 63af426484..7c181a2088 100644
+--- a/lang/attribute/account/src/lib.rs
++++ b/lang/attribute/account/src/lib.rs
+@@ -8,8 +8,8 @@ use {
+         parse::{Parse, ParseStream},
+         parse_macro_input,
+         spanned::Spanned,
+-        token::{Comma, Paren},
+-        Expr, Ident, LitStr,
++        token::Paren,
++        Expr, Ident, LitStr, Token,
+     },
+ };
+ 
+@@ -324,7 +324,7 @@ struct AccountArgs {
+ impl Parse for AccountArgs {
+     fn parse(input: ParseStream) -> syn::Result<Self> {
+         let mut parsed = Self::default();
+-        let args = input.parse_terminated::<_, Comma>(AccountArg::parse)?;
++        let args = input.parse_terminated(AccountArg::parse, Token![,])?;
+         for arg in args {
+             match arg {
+                 AccountArg::ZeroCopy { is_unsafe } => {
+@@ -414,33 +414,24 @@ pub fn derive_zero_copy_accessor(item: proc_macro::TokenStream) -> proc_macro::T
+             field
+                 .attrs
+                 .iter()
+-                .find(|attr| anchor_syn::parser::tts_to_string(&attr.path) == "accessor")
++                .find(|attr| anchor_syn::parser::tts_to_string(attr.path()) == "accessor")
+                 .map(|attr| {
+-                    let mut tts = attr.tokens.clone().into_iter();
+-                    // if user writes #[accessor] with no arguments on a field, tts.next() returns None
+-                    let g_stream = match tts.next() {
+-                        Some(proc_macro2::TokenTree::Group(g)) => g.stream(),
+-                        Some(_) => {
++                    let tokens = match &attr.meta {
++                        syn::Meta::List(list) => list.tokens.clone(),
++                        _ => {
+                             return syn::Error::new_spanned(
+-                                &attr.tokens,
+-                                "invalid `#[accessor]` syntax, expected `#[accessor(Type)]`",
+-                            )
+-                            .into_compile_error();
+-                        }
+-                        None => {
+-                            return syn::Error::new_spanned(
+-                                &attr.tokens,
++                                attr,
+                                 "`#[accessor]` requires a type argument, e.g `#[accessor(MyType)]`",
+                             )
+                             .into_compile_error();
+                         }
+                     };
+-                    let accessor_ty = match g_stream.into_iter().next() {
++                    let accessor_ty = match tokens.into_iter().next() {
+                         Some(token) => token,
+                         None => {
+                             return syn::Error::new_spanned(
+-                                &attr.tokens,
+-                                "`#[accessor]` requires a type inside the parantheses e.g \
++                                attr,
++                                "`#[accessor]` requires a type inside the parentheses e.g \
+                                  `#[accessor(MyType)]`",
+                             )
+                             .into_compile_error()
+@@ -543,7 +534,7 @@ pub fn zero_copy(
+     let attr = account_strct
+         .attrs
+         .iter()
+-        .find(|attr| anchor_syn::parser::tts_to_string(&attr.path) == "repr");
++        .find(|attr| anchor_syn::parser::tts_to_string(attr.path()) == "repr");
+ 
+     let repr = match attr {
+         // Users might want to manually specify repr modifiers e.g. repr(C, packed)
+@@ -560,12 +551,17 @@ pub fn zero_copy(
+     let mut has_pod_attr = false;
+     let mut has_zeroable_attr = false;
+     for attr in account_strct.attrs.iter() {
+-        let token_string = attr.tokens.to_string();
+-        if token_string.contains("bytemuck :: Pod") {
+-            has_pod_attr = true;
++        if !attr.path().is_ident("derive") {
++            continue;
+         }
+-        if token_string.contains("bytemuck :: Zeroable") {
+-            has_zeroable_attr = true;
++        if let syn::Meta::List(list) = &attr.meta {
++            let tokens_str = list.tokens.to_string();
++            if tokens_str.contains("bytemuck :: Pod") {
++                has_pod_attr = true;
++            }
++            if tokens_str.contains("bytemuck :: Zeroable") {
++                has_zeroable_attr = true;
++            }
+         }
+     }
+ 
+diff --git a/lang/attribute/constant/Cargo.toml b/lang/attribute/constant/Cargo.toml
+index b4fe972ee2..6146ec652a 100644
+--- a/lang/attribute/constant/Cargo.toml
++++ b/lang/attribute/constant/Cargo.toml
+@@ -25,4 +25,4 @@ idl-build = ["anchor-syn/idl-build"]
+ [dependencies]
+ anchor-syn = { path = "../../syn", version = "1.0.2" }
+ quote = "1"
+-syn = { version = "1", features = ["full"] }
++syn = { workspace = true, features = ["full"] }
+diff --git a/lang/attribute/error/Cargo.toml b/lang/attribute/error/Cargo.toml
+index e470f51970..92ae3d6170 100644
+--- a/lang/attribute/error/Cargo.toml
++++ b/lang/attribute/error/Cargo.toml
+@@ -25,4 +25,4 @@ idl-build = ["anchor-syn/idl-build"]
+ [dependencies]
+ anchor-syn = { path = "../../syn", version = "1.0.2" }
+ quote = "1"
+-syn = { version = "1", features = ["full"] }
++syn = { workspace = true, features = ["full"] }
+diff --git a/lang/attribute/event/Cargo.toml b/lang/attribute/event/Cargo.toml
+index 484eb6aac8..ba0cd55715 100644
+--- a/lang/attribute/event/Cargo.toml
++++ b/lang/attribute/event/Cargo.toml
+@@ -28,4 +28,4 @@ idl-build = ["anchor-syn/idl-build"]
+ anchor-syn = { path = "../../syn", version = "1.0.2", features = ["hash"] }
+ proc-macro2 = "1"
+ quote = "1"
+-syn = { version = "1", features = ["full"] }
++syn = { workspace = true, features = ["full"] }
+diff --git a/lang/attribute/program/Cargo.toml b/lang/attribute/program/Cargo.toml
+index 0145d9eae0..5562b40c34 100644
+--- a/lang/attribute/program/Cargo.toml
++++ b/lang/attribute/program/Cargo.toml
+@@ -29,4 +29,4 @@ anyhow = "1"
+ heck = "0.3"
+ proc-macro2 = "1"
+ quote = "1"
+-syn = { version = "1", features = ["full"] }
++syn = { workspace = true, features = ["full"] }
+diff --git a/lang/derive/accounts/Cargo.toml b/lang/derive/accounts/Cargo.toml
+index 63c66196ff..be28ba486a 100644
+--- a/lang/derive/accounts/Cargo.toml
++++ b/lang/derive/accounts/Cargo.toml
+@@ -27,4 +27,4 @@ init-if-needed = ["anchor-syn/init-if-needed"]
+ [dependencies]
+ anchor-syn = { path = "../../syn", version = "1.0.2" }
+ quote = "1"
+-syn = { version = "1", features = ["full"] }
++syn = { workspace = true, features = ["full"] }
+diff --git a/lang/derive/serde/Cargo.toml b/lang/derive/serde/Cargo.toml
+index e3d1f91c17..fc4147f48d 100644
+--- a/lang/derive/serde/Cargo.toml
++++ b/lang/derive/serde/Cargo.toml
+@@ -27,7 +27,7 @@ anchor-syn = { path = "../../syn", version = "1.0.2" }
+ proc-macro-crate = "3.4.0"
+ proc-macro2 = "1"
+ quote = "1"
+-syn = { version = "1", features = ["full"] }
++syn = { workspace = true, features = ["full"] }
+ 
+ [dev-dependencies]
+ # Serialization macros require `anchor-lang` to be available to locate `borsh`
+diff --git a/lang/derive/serde/src/lib.rs b/lang/derive/serde/src/lib.rs
+index f0aed34396..efe78cdd3d 100644
+--- a/lang/derive/serde/src/lib.rs
++++ b/lang/derive/serde/src/lib.rs
+@@ -14,23 +14,29 @@ use {
+     proc_macro2::{Span, TokenStream as TokenStream2},
+     proc_macro_crate::FoundCrate,
+     quote::quote,
+-    syn::{parse_macro_input, DeriveInput, Ident, Meta, NestedMeta},
++    syn::{parse_macro_input, DeriveInput, Ident},
+ };
+ 
+ /// Only one item-level `#[borsh]` attribute may be present, and we apply our own borsh attribute.
+ /// Remove any user-provided `#[borsh]` attributes to apply in our generated derive.
+-fn extract_borsh_attrs(input: &mut DeriveInput) -> Vec<NestedMeta> {
++fn extract_borsh_attrs(input: &mut DeriveInput) -> Vec<syn::Meta> {
+     input
+         .attrs
+-        .extract_if(.., |attr| attr.path.is_ident("borsh"))
++        .extract_if(.., |attr| attr.path().is_ident("borsh"))
+         .filter_map(|attr| {
+-            if let Ok(Meta::List(list)) = attr.parse_meta() {
+-                Some(list)
++            if let syn::Meta::List(list) = attr.meta {
++                Some(list.tokens)
+             } else {
+                 None
+             }
+         })
+-        .flat_map(|list| list.nested)
++        .flat_map(|tokens| {
++            syn::parse::Parser::parse2(
++                syn::punctuated::Punctuated::<syn::Meta, syn::Token![,]>::parse_terminated,
++                tokens,
++            )
++            .unwrap_or_default()
++        })
+         .collect()
+ }
+ 
+@@ -43,19 +49,19 @@ fn find_field_borsh_attr(input: &DeriveInput) -> Option<&syn::Attribute> {
+             .fields
+             .iter()
+             .flat_map(|field| field.attrs.iter())
+-            .find(|attr| attr.path.is_ident("borsh")),
++            .find(|attr| attr.path().is_ident("borsh")),
+         syn::Data::Enum(data) => data
+             .variants
+             .iter()
+             .flat_map(|variant| variant.fields.iter())
+             .flat_map(|field| field.attrs.iter())
+-            .find(|attr| attr.path.is_ident("borsh")),
++            .find(|attr| attr.path().is_ident("borsh")),
+         syn::Data::Union(data) => data
+             .fields
+             .named
+             .iter()
+             .flat_map(|field| field.attrs.iter())
+-            .find(|attr| attr.path.is_ident("borsh")),
++            .find(|attr| attr.path().is_ident("borsh")),
+     }
+ }
+ 
+@@ -131,9 +137,13 @@ fn gen_borsh_deserialize(input: TokenStream) -> TokenStream {
+         let unsupported = borsh_attrs.iter().find(|attr| {
+             !matches!(
+                 attr,
+-                NestedMeta::Meta(Meta::NameValue(nv))
++                syn::Meta::NameValue(nv)
+                     if nv.path.is_ident("use_discriminant")
+-                        && matches!(&nv.lit, syn::Lit::Bool(b) if !b.value)
++                        && matches!(
++                            &nv.value,
++                            syn::Expr::Lit(syn::ExprLit { lit: syn::Lit::Bool(b), .. })
++                                if !b.value
++                        )
+             )
+         });
+         if let Some(attr) = unsupported {
+@@ -200,7 +210,7 @@ pub fn anchor_deserialize(input: TokenStream) -> TokenStream {
+     gen_borsh_deserialize(input)
+ }
+ 
+-fn helper_attrs(mac: &str, borsh_attrs: Vec<NestedMeta>) -> TokenStream2 {
++fn helper_attrs(mac: &str, borsh_attrs: Vec<syn::Meta>) -> TokenStream2 {
+     // We need to emit the original borsh deserialization macros on our type,
+     // but derive macros can't emit other derives. To get around this, we use a hack:
+     // 1. Define an `__erase` attribute macro which deletes the item it is applied to
+diff --git a/lang/derive/space/Cargo.toml b/lang/derive/space/Cargo.toml
+index fbc3c4182c..279794abaf 100644
+--- a/lang/derive/space/Cargo.toml
++++ b/lang/derive/space/Cargo.toml
+@@ -21,4 +21,4 @@ indexing-slicing = "deny"
+ [dependencies]
+ proc-macro2 = "1"
+ quote = "1"
+-syn = { version = "1", features = ["extra-traits"] }
++syn = { workspace = true, features = ["extra-traits", "parsing"] }
+diff --git a/lang/derive/space/src/lib.rs b/lang/derive/space/src/lib.rs
+index 027caeeb41..a7504cfe66 100644
+--- a/lang/derive/space/src/lib.rs
++++ b/lang/derive/space/src/lib.rs
+@@ -9,7 +9,7 @@ use {
+         punctuated::Punctuated,
+         spanned::Spanned,
+         token::Comma,
+-        Attribute, DeriveInput, Expr, Field, Fields, GenericArgument, PathArguments, Type,
++        Attribute, DeriveInput, Expr, Field, Fields, GenericArgument, PathArguments, Token, Type,
+         TypeArray,
+     },
+ };
+@@ -201,7 +201,7 @@ fn get_first_ty_arg(args: &PathArguments) -> Option<Type> {
+ 
+ fn parse_len_arg(item: ParseStream) -> Result<VecDeque<TokenStream2>, syn::Error> {
+     // Parse comma-separated expressions
+-    let exprs = item.parse_terminated::<Expr, syn::token::Comma>(Expr::parse)?;
++    let exprs = item.parse_terminated(Expr::parse, Token![,])?;
+     let mut result = VecDeque::new();
+ 
+     // Push them in reverse because get_next_arg() pops from the back
+@@ -221,7 +221,7 @@ fn parse_len_arg(item: ParseStream) -> Result<VecDeque<TokenStream2>, syn::Error
+ fn get_max_len_args(attributes: &[Attribute]) -> Option<VecDeque<TokenStream2>> {
+     attributes
+         .iter()
+-        .find(|a| a.path.is_ident("max_len"))
++        .find(|a| a.path().is_ident("max_len"))
+         .and_then(|a| a.parse_args_with(parse_len_arg).ok())
+ }
+ 
+diff --git a/lang/syn/Cargo.toml b/lang/syn/Cargo.toml
+index d9371914ea..68757adb90 100644
+--- a/lang/syn/Cargo.toml
++++ b/lang/syn/Cargo.toml
+@@ -39,5 +39,5 @@ proc-macro2 = { version = "1.0.100", features = ["span-locations"] }
+ quote = "1"
+ serde = { version = "1", features = ["derive"] }
+ sha2 = "0.11"
+-syn = { version = "1", features = ["full", "extra-traits", "parsing"] }
++syn = { workspace = true, features = ["full", "extra-traits", "parsing"] }
+ thiserror = "1"
+diff --git a/lang/syn/src/codegen/accounts/mod.rs b/lang/syn/src/codegen/accounts/mod.rs
+index 7542c1cb69..5bf2ea3a0a 100644
+--- a/lang/syn/src/codegen/accounts/mod.rs
++++ b/lang/syn/src/codegen/accounts/mod.rs
+@@ -3,7 +3,7 @@ use {
+     quote::quote,
+     std::iter,
+     syn::{
+-        punctuated::Punctuated, ConstParam, GenericParam, LifetimeDef, PredicateLifetime, Token,
++        punctuated::Punctuated, ConstParam, GenericParam, LifetimeParam, PredicateLifetime, Token,
+         TypeParam, WhereClause, WherePredicate,
+     },
+ };
+@@ -115,8 +115,8 @@ fn generics(accs: &AccountsStruct) -> ParsedGenerics {
+                     eq_token: None,
+                     default: None,
+                 }),
+-                GenericParam::Lifetime(LifetimeDef { lifetime, .. }) => {
+-                    GenericParam::Lifetime(LifetimeDef {
++                GenericParam::Lifetime(LifetimeParam { lifetime, .. }) => {
++                    GenericParam::Lifetime(LifetimeParam {
+                         attrs: vec![],
+                         lifetime,
+                         colon_token: None,
+diff --git a/lang/syn/src/codegen/accounts/try_accounts.rs b/lang/syn/src/codegen/accounts/try_accounts.rs
+index d377d22787..6090d93d4d 100644
+--- a/lang/syn/src/codegen/accounts/try_accounts.rs
++++ b/lang/syn/src/codegen/accounts/try_accounts.rs
+@@ -4,7 +4,6 @@ use {
+         AccountField, AccountsStruct, Ty,
+     },
+     quote::{quote, quote_spanned},
+-    syn::Expr,
+ };
+ 
+ // Generates the `Accounts` trait implementation.
+@@ -104,16 +103,16 @@ pub fn generate(accs: &AccountsStruct) -> proc_macro2::TokenStream {
+             let strct_inner = &ix_api;
+             let field_names: Vec<proc_macro2::TokenStream> = ix_api
+                 .iter()
+-                .map(|expr: &Expr| match expr {
+-                    Expr::Type(expr_type) => {
+-                        let field = &expr_type.expr;
++                .map(|expr: &syn::FnArg| match expr {
++                    syn::FnArg::Typed(arg) => {
++                        let field = &arg.pat;
+                         quote! {
+                             #field
+                         }
+                     }
+                     #[allow(
+                         clippy::panic,
+-                        reason = "invariant: ix_api expressions are Expr::Type, validated by the \
++                        reason = "invariant: ix_api args are typed fn args, validated by the \
+                                   parser before codegen"
+                     )]
+                     _ => panic!("Invalid instruction declaration"),
+@@ -166,8 +165,8 @@ pub fn generate(accs: &AccountsStruct) -> proc_macro2::TokenStream {
+                 .iter()
+                 .enumerate()
+                 .map(|(idx, expr)| {
+-                    if let Expr::Type(expr_type) = expr {
+-                        let ty = &expr_type.ty;
++                    if let syn::FnArg::Typed(arg) = expr {
++                        let ty = &arg.ty;
+                         let method_name = syn::Ident::new(
+                             &format!("__anchor_validate_ix_arg_type_{}", idx),
+                             proc_macro2::Span::call_site(),
+@@ -183,8 +182,8 @@ pub fn generate(accs: &AccountsStruct) -> proc_macro2::TokenStream {
+                     } else {
+                         #[allow(
+                             clippy::panic,
+-                            reason = "invariant: ix_api expressions are Expr::Type, validated by \
+-                                      the parser before codegen"
++                            reason = "invariant: ix_api args are typed fn args, validated by the \
++                                      parser before codegen"
+                         )]
+                         {
+                             panic!("Invalid instruction declaration");
+diff --git a/lang/syn/src/idl/defined.rs b/lang/syn/src/idl/defined.rs
+index f6e3b8ac31..ec0e48b81e 100644
+--- a/lang/syn/src/idl/defined.rs
++++ b/lang/syn/src/idl/defined.rs
+@@ -308,13 +308,23 @@ fn get_attr_str(name: impl AsRef<str>, attrs: &[syn::Attribute]) -> Option<Strin
+     attrs
+         .iter()
+         .filter(|attr| {
+-            attr.path
++            attr.path()
+                 .segments
+                 .first()
+                 .filter(|seg| seg.ident == name)
+                 .is_some()
+         })
+-        .map(|attr| attr.tokens.to_string())
++        .filter_map(|attr| match &attr.meta {
++            syn::Meta::List(list) => {
++                let (open, close) = match list.delimiter {
++                    syn::MacroDelimiter::Paren(_) => ("(", ")"),
++                    syn::MacroDelimiter::Bracket(_) => ("[", "]"),
++                    syn::MacroDelimiter::Brace(_) => ("{", "}"),
++                };
++                Some(format!("{open}{}{close}", list.tokens))
++            }
++            _ => None,
++        })
+         .reduce(|acc, cur| {
+             format!(
+                 "{} , {}",
+@@ -509,13 +519,8 @@ pub fn gen_idl_type(
+                     type_aliases: HashMap<String, String>,
+                 }
+ 
+-                // FIXME(#4521): migrate to syn 2.0. syn 1.x was last released in December 2022 and
+-                // does not support Rust syntax stabilised after that date (e.g. precise-capturing
+-                // `use<T>` syntax, C-string literals). Our MSRV has long since moved past what
+-                // syn 1.x supports, so CrateContext::parse will silently fail on any project
+-                // that uses modern Rust syntax. Upgrading to syn 2.0 would let us parse those
+-                // files correctly and remove the None-on-failure workaround below.
+-                static CRATE_DATA_CACHE: OnceLock<Option<CachedCrateData>> = OnceLock::new();
++                static CRATE_DATA_CACHE: OnceLock<std::result::Result<CachedCrateData, String>> =
++                    OnceLock::new();
+ 
+                 // If no path was found, just return an empty path and let the find_path function handle it
+                 let source_path = proc_macro2::Span::call_site()
+@@ -529,31 +534,35 @@ pub fn gen_idl_type(
+                     let name = path.path.segments.last().unwrap().ident.to_string();
+ 
+                     let cache = CRATE_DATA_CACHE.get_or_init(|| {
+-                        CrateContext::parse(&lib_path).ok().map(|ctx| {
+-                            let defined_names: HashSet<String> = ctx
+-                                .structs()
+-                                .map(|s| s.ident.to_string())
+-                                .chain(ctx.enums().map(|e| e.ident.to_string()))
+-                                .collect();
+-                            let mut type_aliases: HashMap<String, String> = HashMap::new();
+-                            for ty in ctx.type_aliases() {
+-                                type_aliases
+-                                    .entry(ty.ident.to_string())
+-                                    .or_insert_with(|| ty.to_token_stream().to_string());
+-                            }
+-                            CachedCrateData {
+-                                defined_names,
+-                                type_aliases,
+-                            }
+-                        })
++                        CrateContext::parse(&lib_path)
++                            .map_err(|e| e.to_string())
++                            .map(|ctx| {
++                                let defined_names: HashSet<String> = ctx
++                                    .structs()
++                                    .map(|s| s.ident.to_string())
++                                    .chain(ctx.enums().map(|e| e.ident.to_string()))
++                                    .collect();
++                                let mut type_aliases: HashMap<String, String> = HashMap::new();
++                                for ty in ctx.type_aliases() {
++                                    type_aliases
++                                        .entry(ty.ident.to_string())
++                                        .or_insert_with(|| ty.to_token_stream().to_string());
++                                }
++                                CachedCrateData {
++                                    defined_names,
++                                    type_aliases,
++                                }
++                            })
+                     });
+ 
+-                    // If CrateContext::parse failed (e.g. the crate uses Rust syntax that
+-                    // syn v1 cannot parse), fall through to "Defined in crate" below.
+-                    // This restores the pre-#4325 silent-fail behaviour and prevents a
+-                    // single unparseable file from poisoning every type lookup in the crate.
+-                    let Some(cache) = cache else {
+-                        break 'cache;
++                    let cache = match cache {
++                        Ok(data) => data,
++                        Err(e) => {
++                            return Err(syn::Error::new(
++                                path.span(),
++                                format!("Failed to parse crate: {e}"),
++                            ));
++                        }
+                     };
+ 
+                     let alias_src = cache.type_aliases.get(&name).cloned();
+diff --git a/lang/syn/src/lib.rs b/lang/syn/src/lib.rs
+index 9dfbd722a6..8665f8482e 100644
+--- a/lang/syn/src/lib.rs
++++ b/lang/syn/src/lib.rs
+@@ -82,7 +82,7 @@ pub struct Overrides {
+ impl Parse for Overrides {
+     fn parse(input: ParseStream) -> ParseResult<Self> {
+         let mut attr = Self::default();
+-        let args = input.parse_terminated::<_, Comma>(NamedArg::parse)?;
++        let args = input.parse_terminated(NamedArg::parse, Token![,])?;
+         for arg in args {
+             match arg.name.to_string().as_str() {
+                 "discriminator" => {
+@@ -161,7 +161,7 @@ pub struct AccountsStruct {
+     // Fields on the accounts struct.
+     pub fields: Vec<AccountField>,
+     // Instruction data api expression.
+-    instruction_api: Option<Punctuated<Expr, Comma>>,
++    instruction_api: Option<Punctuated<syn::FnArg, Comma>>,
+ }
+ 
+ impl Parse for AccountsStruct {
+@@ -187,7 +187,7 @@ impl AccountsStruct {
+     pub fn new(
+         strct: ItemStruct,
+         fields: Vec<AccountField>,
+-        instruction_api: Option<Punctuated<Expr, Comma>>,
++        instruction_api: Option<Punctuated<syn::FnArg, Comma>>,
+     ) -> Self {
+         let ident = strct.ident.clone();
+         let generics = strct.generics;
+@@ -1025,13 +1025,9 @@ impl syn::parse::Parse for SeedsExpr {
+         if stream.peek(syn::token::Bracket) {
+             let content;
+             syn::bracketed!(content in stream);
+-            let mut list: Punctuated<Expr, Token![,]> = content.parse_terminated(Expr::parse)?;
+-
+-            // Strip a trailing comma if present.
+-            // Use `pop_punct` when we update to syn 2.0
+-            if let Some(pair) = list.pop() {
+-                list.push_value(pair.into_value());
+-            }
++            let mut list: Punctuated<Expr, Token![,]> =
++                content.parse_terminated(Expr::parse, Token![,])?;
++            list.pop_punct();
+ 
+             Ok(SeedsExpr::List(list))
+         } else {
+@@ -1281,8 +1277,14 @@ impl<T> Deref for Context<T> {
+     }
+ }
+ 
+-impl<T> Spanned for Context<T> {
+-    fn span(&self) -> Span {
++impl<T> Context<T> {
++    pub fn span(&self) -> Span {
+         self.span
+     }
+ }
++
++impl<T: ToTokens> ToTokens for Context<T> {
++    fn to_tokens(&self, tokens: &mut TokenStream) {
++        self.inner.to_tokens(tokens)
++    }
++}
+diff --git a/lang/syn/src/parser/accounts/constraints.rs b/lang/syn/src/parser/accounts/constraints.rs
+index e1edc97e4f..2be18e8b30 100644
+--- a/lang/syn/src/parser/accounts/constraints.rs
++++ b/lang/syn/src/parser/accounts/constraints.rs
+@@ -19,7 +19,7 @@ pub fn parse(f: &syn::Field, f_ty: Option<&Ty>) -> ParseResult<ConstraintGroup>
+ }
+ 
+ pub fn is_account(attr: &&syn::Attribute) -> bool {
+-    attr.path
++    attr.path()
+         .get_ident()
+         .is_some_and(|ident| ident == "account")
+ }
+diff --git a/lang/syn/src/parser/accounts/mod.rs b/lang/syn/src/parser/accounts/mod.rs
+index dceb7c192b..895a25891b 100644
+--- a/lang/syn/src/parser/accounts/mod.rs
++++ b/lang/syn/src/parser/accounts/mod.rs
+@@ -11,23 +11,64 @@ use {
+ };
+ 
+ pub fn parse(accounts_struct: &syn::ItemStruct) -> ParseResult<AccountsStruct> {
+-    let instruction_api: Option<Punctuated<Expr, Comma>> = accounts_struct
++    let instruction_api: Option<Punctuated<syn::FnArg, Comma>> = accounts_struct
+         .attrs
+         .iter()
+         .find(|a| {
+-            a.path
++            a.path()
+                 .get_ident()
+                 .is_some_and(|ident| ident == "instruction")
+         })
+-        .map(|ix_attr| ix_attr.parse_args_with(Punctuated::<Expr, Comma>::parse_terminated))
++        .map(|ix_attr| ix_attr.parse_args_with(Punctuated::<syn::FnArg, Comma>::parse_terminated))
+         .transpose()?;
+ 
++    if let Some(ref api) = instruction_api {
++        for arg in api.iter() {
++            match arg {
++                syn::FnArg::Receiver(r) => {
++                    return Err(ParseError::new(
++                        r.self_token.span,
++                        "#[instruction] args cannot use `self`",
++                    ));
++                }
++                syn::FnArg::Typed(pat_type) => match pat_type.pat.as_ref() {
++                    syn::Pat::Ident(pat_ident) => {
++                        if let Some(by_ref) = &pat_ident.by_ref {
++                            return Err(ParseError::new_spanned(
++                                by_ref,
++                                "#[instruction] arg names cannot use `ref`",
++                            ));
++                        }
++                        if let Some(mutability) = &pat_ident.mutability {
++                            return Err(ParseError::new_spanned(
++                                mutability,
++                                "#[instruction] arg names cannot use `mut`",
++                            ));
++                        }
++                        if let Some((_, subpat)) = &pat_ident.subpat {
++                            return Err(ParseError::new_spanned(
++                                subpat,
++                                "#[instruction] arg names cannot use subpatterns",
++                            ));
++                        }
++                    }
++                    _ => {
++                        return Err(ParseError::new_spanned(
++                            &pat_type.pat,
++                            "#[instruction] arg names must be plain identifiers, e.g. `data: u64`",
++                        ));
++                    }
++                },
++            }
++        }
++    }
++
+     #[cfg(feature = "event-cpi")]
+     let accounts_struct = {
+         let is_event_cpi = accounts_struct
+             .attrs
+             .iter()
+-            .filter_map(|attr| attr.path.get_ident())
++            .filter_map(|attr| attr.path().get_ident())
+             .any(|ident| *ident == "event_cpi");
+         if is_event_cpi {
+             event_cpi::add_event_cpi_accounts(accounts_struct)?
+@@ -433,7 +474,11 @@ fn parse_ty(f: &syn::Field) -> ParseResult<(Ty, bool)> {
+ }
+ 
+ fn option_to_inner_path(path: &Path) -> ParseResult<Path> {
+-    let segment_0 = path.segments[0].clone();
++    let segment_0 = path
++        .segments
++        .first()
++        .ok_or_else(|| ParseError::new(path.span(), "expected a path segment"))?
++        .clone();
+     match segment_0.arguments {
+         syn::PathArguments::AngleBracketed(args) => {
+             if args.args.len() != 1 {
+@@ -442,10 +487,14 @@ fn option_to_inner_path(path: &Path) -> ParseResult<Path> {
+                     "can only have one argument in option",
+                 ));
+             }
+-            match &args.args[0] {
++            let arg_0 = args
++                .args
++                .first()
++                .ok_or_else(|| ParseError::new(args.args.span(), "expected type argument"))?;
++            match arg_0 {
+                 syn::GenericArgument::Type(syn::Type::Path(ty_path)) => Ok(ty_path.path.clone()),
+                 _ => Err(ParseError::new(
+-                    args.args[1].span(),
++                    arg_0.span(),
+                     "first bracket argument must be a lifetime",
+                 )),
+             }
+@@ -490,7 +539,10 @@ fn ident_string(f: &syn::Field) -> ParseResult<(String, bool, Path)> {
+         ));
+     }
+ 
+-    let segments = &path.segments[0];
++    let segments = path
++        .segments
++        .first()
++        .ok_or_else(|| ParseError::new(path.span(), "expected a path segment"))?;
+     Ok((segments.ident.to_string(), optional, path))
+ }
+ 
+@@ -519,7 +571,10 @@ fn parse_lazy_account_ty(path: &syn::Path) -> ParseResult<LazyAccountTy> {
+ 
+ fn parse_migration_ty(path: &syn::Path) -> ParseResult<MigrationTy> {
+     // Migration<'info, From, To>
+-    let segments = &path.segments[0];
++    let segments = path
++        .segments
++        .first()
++        .ok_or_else(|| ParseError::new(path.span(), "expected a path segment"))?;
+     match &segments.arguments {
+         syn::PathArguments::AngleBracketed(args) => {
+             // Expected: <'info, From, To> - 3 args
+@@ -530,23 +585,21 @@ fn parse_migration_ty(path: &syn::Path) -> ParseResult<MigrationTy> {
+                 ));
+             }
+             // First arg is lifetime, second is From, third is To
+-            let from_type_path = match &args.args[1] {
++            let from_arg = args
++                .args
++                .get(1)
++                .ok_or_else(|| ParseError::new(args.args.span(), "expected From type argument"))?;
++            let from_type_path = match from_arg {
+                 syn::GenericArgument::Type(syn::Type::Path(ty_path)) => ty_path.clone(),
+-                _ => {
+-                    return Err(ParseError::new(
+-                        args.args[1].span(),
+-                        "From type must be a path",
+-                    ));
+-                }
++                _ => return Err(ParseError::new(from_arg.span(), "From type must be a path")),
+             };
+-            let to_type_path = match &args.args[2] {
++            let to_arg = args
++                .args
++                .get(2)
++                .ok_or_else(|| ParseError::new(args.args.span(), "expected To type argument"))?;
++            let to_type_path = match to_arg {
+                 syn::GenericArgument::Type(syn::Type::Path(ty_path)) => ty_path.clone(),
+-                _ => {
+-                    return Err(ParseError::new(
+-                        args.args[2].span(),
+-                        "To type must be a path",
+-                    ));
+-                }
++                _ => return Err(ParseError::new(to_arg.span(), "To type must be a path")),
+             };
+             Ok(MigrationTy {
+                 from_type_path,
+@@ -583,7 +636,10 @@ fn parse_interface_ty(path: &syn::Path) -> ParseResult<InterfaceTy> {
+ 
+ // Special parsing function for Program that handles both Program<'info> and Program<'info, T>
+ fn parse_program_account(path: &syn::Path) -> ParseResult<syn::TypePath> {
+-    let segments = &path.segments[0];
++    let segments = path
++        .segments
++        .first()
++        .ok_or_else(|| ParseError::new(path.span(), "expected a path segment"))?;
+     match &segments.arguments {
+         syn::PathArguments::AngleBracketed(args) => {
+             match args.args.len() {
+@@ -608,13 +664,18 @@ fn parse_program_account(path: &syn::Path) -> ParseResult<syn::TypePath> {
+                     })
+                 }
+                 // Program<'info, T> - lifetime and type
+-                2 => match &args.args[1] {
+-                    syn::GenericArgument::Type(syn::Type::Path(ty_path)) => Ok(ty_path.clone()),
+-                    _ => Err(ParseError::new(
+-                        args.args[1].span(),
+-                        "second bracket argument must be a type",
+-                    )),
+-                },
++                2 => {
++                    let second_arg = args.args.get(1).ok_or_else(|| {
++                        ParseError::new(args.args.span(), "expected type argument")
++                    })?;
++                    match second_arg {
++                        syn::GenericArgument::Type(syn::Type::Path(ty_path)) => Ok(ty_path.clone()),
++                        _ => Err(ParseError::new(
++                            second_arg.span(),
++                            "second bracket argument must be a type",
++                        )),
++                    }
++                }
+                 _ => Err(ParseError::new(
+                     args.args.span(),
+                     "Program must have either just a lifetime (Program<'info>) or a lifetime and \
+@@ -633,7 +694,10 @@ fn parse_program_account(path: &syn::Path) -> ParseResult<syn::TypePath> {
+ fn parse_account(mut path: &syn::Path) -> ParseResult<syn::TypePath> {
+     let path_str = parser::tts_to_string(path).replace(' ', "");
+     if path_str.starts_with("Box<Account<") || path_str.starts_with("Box<InterfaceAccount<") {
+-        let segments = &path.segments[0];
++        let segments = path
++            .segments
++            .first()
++            .ok_or_else(|| ParseError::new(path.span(), "expected a path segment"))?;
+         match &segments.arguments {
+             syn::PathArguments::AngleBracketed(args) => {
+                 // Expected: <'info, MyType>.
+@@ -643,13 +707,17 @@ fn parse_account(mut path: &syn::Path) -> ParseResult<syn::TypePath> {
+                         "bracket arguments must be the lifetime and type",
+                     ));
+                 }
+-                match &args.args[0] {
++                let first_arg = args
++                    .args
++                    .first()
++                    .ok_or_else(|| ParseError::new(args.args.span(), "expected type argument"))?;
++                match first_arg {
+                     syn::GenericArgument::Type(syn::Type::Path(ty_path)) => {
+                         path = &ty_path.path;
+                     }
+                     _ => {
+                         return Err(ParseError::new(
+-                            args.args[1].span(),
++                            first_arg.span(),
+                             "first bracket argument must be a lifetime",
+                         ))
+                     }
+@@ -664,7 +732,10 @@ fn parse_account(mut path: &syn::Path) -> ParseResult<syn::TypePath> {
+         }
+     }
+ 
+-    let segments = &path.segments[0];
++    let segments = path
++        .segments
++        .first()
++        .ok_or_else(|| ParseError::new(path.span(), "expected a path segment"))?;
+     match &segments.arguments {
+         syn::PathArguments::AngleBracketed(args) => {
+             // Expected: <'info, MyType>.
+@@ -674,10 +745,14 @@ fn parse_account(mut path: &syn::Path) -> ParseResult<syn::TypePath> {
+                     "bracket arguments must be the lifetime and type",
+                 ));
+             }
+-            match &args.args[1] {
++            let second_arg = args
++                .args
++                .get(1)
++                .ok_or_else(|| ParseError::new(args.args.span(), "expected type argument"))?;
++            match second_arg {
+                 syn::GenericArgument::Type(syn::Type::Path(ty_path)) => Ok(ty_path.clone()),
+                 _ => Err(ParseError::new(
+-                    args.args[1].span(),
++                    second_arg.span(),
+                     "first bracket argument must be a lifetime",
+                 )),
+             }
+@@ -690,7 +765,10 @@ fn parse_account(mut path: &syn::Path) -> ParseResult<syn::TypePath> {
+ }
+ 
+ fn parse_sysvar(path: &syn::Path) -> ParseResult<SysvarTy> {
+-    let segments = &path.segments[0];
++    let segments = path
++        .segments
++        .first()
++        .ok_or_else(|| ParseError::new(path.span(), "expected a path segment"))?;
+     let account_ident = match &segments.arguments {
+         syn::PathArguments::AngleBracketed(args) => {
+             // Expected: <'info, MyType>.
+@@ -700,7 +778,11 @@ fn parse_sysvar(path: &syn::Path) -> ParseResult<SysvarTy> {
+                     "bracket arguments must be the lifetime and type",
+                 ));
+             }
+-            match &args.args[1] {
++            let second_arg = args
++                .args
++                .get(1)
++                .ok_or_else(|| ParseError::new(args.args.span(), "expected type argument"))?;
++            match second_arg {
+                 syn::GenericArgument::Type(syn::Type::Path(ty_path)) => {
+                     // TODO: allow segmented paths.
+                     if ty_path.path.segments.len() != 1 {
+@@ -709,12 +791,14 @@ fn parse_sysvar(path: &syn::Path) -> ParseResult<SysvarTy> {
+                             "segmented paths are not currently allowed",
+                         ));
+                     }
+-                    let path_segment = &ty_path.path.segments[0];
++                    let path_segment = ty_path.path.segments.first().ok_or_else(|| {
++                        ParseError::new(ty_path.path.span(), "expected a path segment")
++                    })?;
+                     path_segment.ident.clone()
+                 }
+                 _ => {
+                     return Err(ParseError::new(
+-                        args.args[1].span(),
++                        second_arg.span(),
+                         "first bracket argument must be a lifetime",
+                     ))
+                 }
+diff --git a/lang/syn/src/parser/context.rs b/lang/syn/src/parser/context.rs
+index dc4425f6c7..0528ace0e0 100644
+--- a/lang/syn/src/parser/context.rs
++++ b/lang/syn/src/parser/context.rs
+@@ -64,11 +64,19 @@ impl CrateContext {
+             for unsafe_field in ctx.unsafe_struct_fields() {
+                 // Check if unsafe field type has been documented with a /// SAFETY: doc string.
+                 let is_documented = unsafe_field.attrs.iter().any(|attr| {
+-                    attr.tokens.clone().into_iter().any(|token| match token {
+-                        // Check for doc comments containing CHECK
+-                        proc_macro2::TokenTree::Literal(s) => s.to_string().contains("CHECK"),
+-                        _ => false,
+-                    })
++                    if let syn::Meta::NameValue(syn::MetaNameValue {
++                        value:
++                            syn::Expr::Lit(syn::ExprLit {
++                                lit: syn::Lit::Str(s),
++                                ..
++                            }),
++                        ..
++                    }) = &attr.meta
++                    {
++                        s.value().contains("CHECK")
++                    } else {
++                        false
++                    }
+                 });
+                 if !is_documented {
+                     #[allow(
+@@ -250,14 +258,16 @@ impl ParsedModule {
+     fn unsafe_struct_fields(&self) -> impl Iterator<Item = &syn::Field> {
+         let accounts_filter = |item_struct: &&syn::ItemStruct| {
+             item_struct.attrs.iter().any(|attr| {
+-                match attr.parse_meta() {
+-                    Ok(syn::Meta::List(syn::MetaList{path, nested, ..})) => {
+-                        path.is_ident("derive") && nested.iter().any(|nested| {
+-                            matches!(nested, syn::NestedMeta::Meta(syn::Meta::Path(path)) if path.is_ident("Accounts"))
++                attr.path().is_ident("derive")
++                    && attr
++                        .parse_args_with(
++                            syn::punctuated::Punctuated::<syn::Meta, syn::Token![,]>::parse_terminated,
++                        )
++                        .ok()
++                        .is_some_and(|args| {
++                            args.iter()
++                                .any(|m| matches!(m, syn::Meta::Path(p) if p.is_ident("Accounts")))
+                         })
+-                    }
+-                    _ => false
+-                }
+             })
+         };
+ 
+diff --git a/lang/syn/src/parser/docs.rs b/lang/syn/src/parser/docs.rs
+index 02c45d5054..9be09cfde5 100644
+--- a/lang/syn/src/parser/docs.rs
++++ b/lang/syn/src/parser/docs.rs
+@@ -1,23 +1,27 @@
+-use syn::{Lit::Str, Meta::NameValue};
+-
+ // returns vec of doc strings
+ pub fn parse(attrs: &[syn::Attribute]) -> Option<Vec<String>> {
+     let doc_strings: Vec<String> = attrs
+         .iter()
+-        .filter_map(|attr| match attr.parse_meta() {
+-            Ok(NameValue(meta)) => {
+-                if meta.path.is_ident("doc") {
+-                    if let Str(doc) = meta.lit {
+-                        let val = doc.value().trim().to_string();
+-                        if val.starts_with("CHECK:") {
+-                            return None;
+-                        }
+-                        return Some(val);
+-                    }
++        .filter_map(|attr| {
++            if !attr.path().is_ident("doc") {
++                return None;
++            }
++            if let syn::Meta::NameValue(syn::MetaNameValue {
++                value:
++                    syn::Expr::Lit(syn::ExprLit {
++                        lit: syn::Lit::Str(doc),
++                        ..
++                    }),
++                ..
++            }) = &attr.meta
++            {
++                let val = doc.value().trim().to_string();
++                if val.starts_with("CHECK:") {
++                    return None;
+                 }
+-                None
++                return Some(val);
+             }
+-            _ => None,
++            None
+         })
+         .collect();
+     if doc_strings.is_empty() {
+diff --git a/lang/syn/src/parser/error.rs b/lang/syn/src/parser/error.rs
+index b4611daf2d..15f514daa2 100644
+--- a/lang/syn/src/parser/error.rs
++++ b/lang/syn/src/parser/error.rs
+@@ -42,9 +42,7 @@ pub fn parse(error_enum: &mut syn::ItemEnum, args: Option<ErrorArgs>) -> Result<
+             last_discriminant = id + 1;
+ 
+             // Remove any non-doc attributes on the error variant.
+-            variant
+-                .attrs
+-                .retain(|attr| attr.path.segments[0].ident == "doc");
++            variant.attrs.retain(|attr| attr.path().is_ident("doc"));
+ 
+             Ok(ErrorCode { id, ident, msg })
+         })
+@@ -62,7 +60,7 @@ fn parse_error_attribute(variant: &syn::Variant) -> Result<Option<String>, syn::
+     let attrs = variant
+         .attrs
+         .iter()
+-        .filter(|attr| attr.path.segments[0].ident != "doc")
++        .filter(|attr| !attr.path().is_ident("doc"))
+         .collect::<Vec<_>>();
+     match attrs.len() {
+         0 => Ok(None),
+@@ -72,24 +70,19 @@ fn parse_error_attribute(variant: &syn::Variant) -> Result<Option<String>, syn::
+                 reason = "inside match arm where attrs.len() == 1"
+             )]
+             let attr = &attrs[0];
+-            let attr_str = attr.path.segments[0].ident.to_string();
+-            if attr_str != "msg" {
++            if !attr.path().is_ident("msg") {
+                 return Err(syn::Error::new(
+                     attr.span(),
+                     "use `#[msg(\"...\")]` to specify error strings",
+                 ));
+             }
+ 
+-            let mut tts = attr.tokens.clone().into_iter();
+-            let g_stream = match tts.next() {
+-                Some(proc_macro2::TokenTree::Group(g)) => g.stream(),
+-                Some(tt) => {
+-                    return Err(syn::Error::new(tt.span(), "expected `#[msg(\"message\")]`"))
+-                }
+-                None => {
++            let g_stream = match &attr.meta {
++                syn::Meta::List(list) => list.tokens.clone(),
++                _ => {
+                     return Err(syn::Error::new(
+                         attr.span(),
+-                        "`#[msg]` requires a message argument, e.g. `#[msg(\"My error\")]`",
++                        "expected `#[msg(\"message\")]`",
+                     ))
+                 }
+             };
+diff --git a/lang/syn/src/parser/program/instructions.rs b/lang/syn/src/parser/program/instructions.rs
+index 74a0ca5a19..5dd8e628df 100644
+--- a/lang/syn/src/parser/program/instructions.rs
++++ b/lang/syn/src/parser/program/instructions.rs
+@@ -83,7 +83,7 @@ pub fn parse(program_mod: &syn::ItemMod) -> ParseResult<(Vec<Ix>, Option<Fallbac
+ fn parse_overrides(attrs: &[syn::Attribute]) -> ParseResult<Option<Overrides>> {
+     attrs
+         .iter()
+-        .find(|attr| match attr.path.segments.last() {
++        .find(|attr| match attr.path().segments.last() {
+             Some(seg) => seg.ident == "instruction",
+             _ => false,
+         })
+@@ -168,7 +168,7 @@ fn parse_cfg(method: &syn::ItemFn) -> Vec<Attribute> {
+     method
+         .attrs
+         .iter()
+-        .filter_map(|attr| match attr.path.is_ident("cfg") {
++        .filter_map(|attr| match attr.path().is_ident("cfg") {
+             true => Some(attr.to_owned()),
+             false => None,
+         })
+diff --git a/lang/syn/src/parser/program/mod.rs b/lang/syn/src/parser/program/mod.rs
+index 840d4e909d..171c88f730 100644
+--- a/lang/syn/src/parser/program/mod.rs
++++ b/lang/syn/src/parser/program/mod.rs
+@@ -53,5 +53,10 @@ fn ctx_accounts_ident(path_ty: &syn::PatType) -> ParseResult<proc_macro2::Ident>
+             ))
+         }
+     };
+-    Ok(path.segments[0].ident.clone())
++    Ok(path
++        .segments
++        .first()
++        .ok_or_else(|| ParseError::new(path.span(), "expected a path segment"))?
++        .ident
++        .clone())
+ }
+diff --git a/tests/idl/programs/generics/src/helper.rs b/tests/idl/programs/generics/src/helper.rs
+new file mode 100644
+index 0000000000..1dfdd2d283
+--- /dev/null
++++ b/tests/idl/programs/generics/src/helper.rs
+@@ -0,0 +1,9 @@
++// Regression case for #4521 / #4523: precise-capture syntax (`+ use<T>`)
++// stabilised in Rust 1.82 could not be parsed by syn v1, which made
++// `CrateContext::parse` fail and broke IDL generation. Keeping this in
++// the generics program exercises the IDL-build code path in CI.
++
++#[allow(dead_code)]
++pub fn identity<T: Clone>(x: T) -> impl Clone + use<T> {
++    x
++}
+diff --git a/tests/idl/programs/generics/src/lib.rs b/tests/idl/programs/generics/src/lib.rs
+index 4e4b740b26..5b0efc3d4f 100644
+--- a/tests/idl/programs/generics/src/lib.rs
++++ b/tests/idl/programs/generics/src/lib.rs
+@@ -2,6 +2,8 @@ use anchor_lang::prelude::*;
+ 
+ declare_id!("Generics111111111111111111111111111111111111");
+ 
++mod helper;
++
+ #[program]
+ pub mod generics {
+     use super::*;

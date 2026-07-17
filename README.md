@@ -63,6 +63,7 @@ generates correct IDL.
 - Merged PR: https://github.com/otter-sec/anchor/pull/4523
 - Issue it fixes: https://github.com/otter-sec/anchor/issues/4521
 - My fork with the branch: https://github.com/eteen12/anchor/tree/fix/syn2-crate-context-parse
+- Related contribution: [anchor-verified-build](https://github.com/eteen12/anchor-verified-build) (PR #4522)
 
 ---
 
